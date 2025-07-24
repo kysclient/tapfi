@@ -1,0 +1,13 @@
+{
+  "singleQuote": true,
+  "printWidth": 1000,
+  "tabWidth": 2,
+  "bracketSpacing": true,
+  "jsxBracketSameLine": false,
+  "jsxSingleQuote": false,
+  "spaceBeforeFunctionParen": true,
+  "proseWrap": "preserve",
+  "semi": false,
+  "trailingComma": "none",
+  "useTabs": false
+}
