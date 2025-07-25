@@ -46,16 +46,25 @@ export class Web3Service {
   }
 
   async connectWallet(): Promise<string> {
+    console.log('zz')
     try {
       const account = getAccount(config);
       if (account.isConnected && account.address) {
         return getAddress(account.address);
       }
 
-      // Web3Modal을 통해 지갑 연결 시도
+      // WalletConnect 커넥터를 기본으로 사용
+      const walletConnectConnector = config.connectors.find((c) => c.id === 'injected');
+      if (!walletConnectConnector) {
+        throw new Error("WalletConnect connector not found.");
+      }
+
       const result = await connect(config, {
-        connector: config.connectors[0], // 첫 번째 커넥터 사용 (예: MetaMask)
+        connector: walletConnectConnector,
       });
+      // const result = await connect(config, {
+      //   connector: config.connectors.find((c) => c.id === 'injected'),
+      // });
 
       if (result.accounts && result.accounts[0]) {
         return getAddress(result.accounts[0]);
@@ -187,7 +196,6 @@ export class Web3Service {
       await new Promise((resolve) => setTimeout(resolve, 2000));
       return "0x" + Math.random().toString(16).substr(2, 64);
     }
-    console.log('test ? ')
 
     if (!this.provider) throw new Error("Provider not initialized");
 

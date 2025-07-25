@@ -4,7 +4,8 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/provider/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
-import MainLayout from "@/components/layouts/main-layout"
+import { headers } from "next/headers"
+import ContextProvider from "@/components/provider/context-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -16,18 +17,20 @@ export const metadata: Metadata = {
   generator: 'v0.dev'
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const headersData = await headers();
+  const cookies = headersData.get('cookie');
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem={true} disableTransitionOnChange>
-          <MainLayout>
+          <ContextProvider cookies={cookies}>
             {children}
-          </MainLayout>
+          </ContextProvider>
           <Toaster />
         </ThemeProvider>
       </body>

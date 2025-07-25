@@ -4,13 +4,12 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { QrCode, Wallet, Zap, Crown, History } from "lucide-react"
-import { withWallet } from "@/components/hoc/withWallet"
-import { withTapToken } from "@/components/hoc/withTapToken"
 import { QRGenerator } from "@/components/QRGenerator"
 import { PaymentHistory } from "@/components/PaymentHistory"
 import { PremiumFeatures } from "@/components/PremiumFeatures"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import Link from "next/link"
+import { withWalletAndTapToken } from "../hoc/with-wallet-and-taptoken"
 
 interface HomePageProps {
     isWalletConnected: boolean
@@ -169,4 +168,4 @@ function HomePage({
     )
 }
 
-export default withTapToken(withWallet(HomePage))
+export default withWalletAndTapToken(HomePage)
