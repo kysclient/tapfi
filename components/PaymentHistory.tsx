@@ -7,14 +7,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowUpRight, ArrowDownLeft, Search, ExternalLink, Calendar } from "lucide-react"
-import { web3Service, type TransactionData } from "@/services/web3Service"
+import { TransactionData } from "./hoc/with-wallet-and-taptoken"
 
 interface PaymentHistoryProps {
   isWalletConnected: boolean
   walletAddress: string
+  getTransactionHistory: (walletAddress: string) => Promise<TransactionData[]>
 }
 
-export function PaymentHistory({ isWalletConnected, walletAddress }: PaymentHistoryProps) {
+export function PaymentHistory({ isWalletConnected, walletAddress, getTransactionHistory }: PaymentHistoryProps) {
   const [transactions, setTransactions] = useState<TransactionData[]>([])
   const [filteredTransactions, setFilteredTransactions] = useState<TransactionData[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -35,7 +36,7 @@ export function PaymentHistory({ isWalletConnected, walletAddress }: PaymentHist
   const fetchTransactionHistory = async () => {
     setIsLoading(true)
     try {
-      const txHistory = await web3Service.getTransactionHistory(walletAddress)
+      const txHistory = await getTransactionHistory(walletAddress)
       const processedTx = txHistory.map((tx) => ({
         ...tx,
         type: tx.to.toLowerCase() === walletAddress.toLowerCase() ? ("received" as const) : ("sent" as const),
@@ -180,9 +181,8 @@ export function PaymentHistory({ isWalletConnected, walletAddress }: PaymentHist
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        tx.type === "received" ? "bg-green-100 dark:bg-green-900/30" : "bg-blue-100 dark:bg-blue-900/30"
-                      }`}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === "received" ? "bg-green-100 dark:bg-green-900/30" : "bg-blue-100 dark:bg-blue-900/30"
+                        }`}
                     >
                       {tx.type === "received" ? (
                         <ArrowDownLeft className="w-5 h-5 text-green-600 dark:text-green-400" />

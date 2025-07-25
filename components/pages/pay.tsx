@@ -1,19 +1,17 @@
-"use client";
+"use client"
 
-import { useState, useEffect, ComponentType } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { CheckCircle, AlertCircle, Loader2, ExternalLink, ArrowLeft } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import Link from "next/link";
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseEther } from "viem";
-import { PaymentData, WalletAndTapTokenProps, withWalletAndTapToken } from "../hoc/with-wallet-and-taptoken";
+import { useState, useEffect, ComponentType } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
+import { CheckCircle, AlertCircle, Loader2, ExternalLink, ArrowLeft } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import Link from "next/link"
+import { useWriteContract, useSendTransaction, useWaitForTransactionReceipt } from "wagmi"
+import { parseEther, parseUnits } from "viem"
+import { PaymentData, WalletAndTapTokenProps, withWalletAndTapToken } from "../hoc/with-wallet-and-taptoken"
 
-// $TAP 토큰 스마트 계약 ABI (간소화된 ERC-20 ABI)
-const TAP_TOKEN_ABI = [
+const ERC20_ABI = [
   {
     constant: false,
     inputs: [
@@ -24,14 +22,10 @@ const TAP_TOKEN_ABI = [
     outputs: [{ name: "", type: "bool" }],
     type: "function",
   },
-] as const;
+] as const
 
-// $TAP 토큰 스마트 계약 주소 (Sepolia 테스트넷, 예시 주소)
-const TAP_TOKEN_ADDRESS = "0xYourTapTokenContractAddressHere"; // 실제 $TAP 토큰 주소로 교체
-
-// 서버에서 전달받는 props
 interface ServerPaymentPageProps {
-  paymentData: PaymentData | null;
+  paymentData: PaymentData | null
 }
 
 function PaymentPageContent({
@@ -39,49 +33,29 @@ function PaymentPageContent({
   walletAddress,
   connectWallet,
   chainId,
-  tapBalance,
-  isPremiumUser,
-  premiumTier,
-  refreshTapBalance,
   paymentData,
+  getTokenInfo,
 }: WalletAndTapTokenProps) {
-  const [paymentStatus, setPaymentStatus] = useState<"idle" | "pending" | "confirmed" | "failed">("idle");
-  const { toast } = useToast();
-  const { writeContract, data: txHash, isPending, error: writeError } = useWriteContract();
-  const { data: receipt, isLoading: isReceiptLoading } = useWaitForTransactionReceipt({
-    hash: txHash,
-  });
-
-  // 트랜잭션 상태 처리
-  useEffect(() => {
-    if (writeError) {
-      setPaymentStatus("failed");
-      toast({
-        title: "Payment failed",
-        description: writeError.message || "An error occurred while processing the payment",
-        variant: "destructive",
-      });
-    }
-  }, [writeError, toast]);
+  const [paymentStatus, setPaymentStatus] = useState<"idle" | "pending" | "confirmed" | "failed">("idle")
+  const [txHash, setTxHash] = useState<`0x${string}` | undefined>(undefined)
+  const { toast } = useToast()
+  const { writeContractAsync } = useWriteContract()
+  const { sendTransactionAsync } = useSendTransaction()
+  const { data: receipt, isLoading: isReceiptLoading } = useWaitForTransactionReceipt({ hash: txHash })
 
   useEffect(() => {
     if (receipt) {
-      setPaymentStatus(receipt.status === "success" ? "confirmed" : "failed");
-      if (receipt.status === "success") {
-        toast({
-          title: "Payment successful",
-          description: "Your payment has been processed successfully",
-        });
-        refreshTapBalance();
-      } else {
-        toast({
-          title: "Payment failed",
-          description: "The transaction was not confirmed",
-          variant: "destructive",
-        });
-      }
+      setPaymentStatus(receipt.status === "success" ? "confirmed" : "failed")
+      toast({
+        title: receipt.status === "success" ? "Payment successful" : "Payment failed",
+        description:
+          receipt.status === "success"
+            ? "Your payment has been processed successfully"
+            : "The transaction was not confirmed",
+        variant: receipt.status === "success" ? "default" : "destructive",
+      })
     }
-  }, [receipt, toast, refreshTapBalance]);
+  }, [receipt, toast])
 
   if (!paymentData) {
     return (
@@ -100,42 +74,54 @@ function PaymentPageContent({
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
   const processPayment = async () => {
     if (!isWalletConnected) {
-      await connectWallet();
-      return;
+      await connectWallet()
+      return
     }
 
-    if (chainId !== 11155111) {
+    if (paymentData.chainId !== 73571) {
       toast({
         title: "Wrong network",
-        description: "Please switch to Sepolia Testnet",
+        description: "Please switch to Virtual Sepolia Testnet",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
-    setPaymentStatus("pending");
-
+    setPaymentStatus("pending")
     try {
-      await writeContract({
-        address: TAP_TOKEN_ADDRESS,
-        abi: TAP_TOKEN_ABI,
-        functionName: "transfer",
-        args: [paymentData.to, parseEther(paymentData.amount)],
-      });
+      let hash: `0x${string}`
+      if (paymentData.token === "ETH") {
+        hash = await sendTransactionAsync({
+          to: paymentData.to as `0x${string}`,
+          value: parseEther(paymentData.amount),
+        })
+      } else {
+        const tokenInfo = getTokenInfo(paymentData.token)
+        if (!tokenInfo) {
+          throw new Error(`Token ${paymentData.token} is not supported`)
+        }
+        hash = await writeContractAsync({
+          address: tokenInfo.address as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "transfer",
+          args: [paymentData.to as `0x${string}`, parseUnits(paymentData.amount, tokenInfo.decimals)],
+        })
+      }
+      setTxHash(hash)
     } catch (error: any) {
-      setPaymentStatus("failed");
+      setPaymentStatus("failed")
       toast({
         title: "Payment failed",
         description: error.message || "An error occurred while processing the payment",
         variant: "destructive",
-      });
+      })
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
@@ -143,11 +129,8 @@ function PaymentPageContent({
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-4 h-4" />
-            Back to TapFi
+            Back
           </Link>
-          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-            Payment Request
-          </Badge>
         </div>
       </header>
       <main className="max-w-2xl mx-auto px-4 py-8">
@@ -164,7 +147,7 @@ function PaymentPageContent({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => window.open(`https://sepolia.etherscan.io/tx/${txHash}`, "_blank")}
+                      onClick={() => window.open(`https://dashboard.tenderly.co/explorer/vnet/6a6910ba-5831-4758-9d89-1f8e3169433f/tx/${txHash}`, "_blank")}
                     >
                       <ExternalLink className="w-3 h-3 mr-1" />
                       View
@@ -200,7 +183,7 @@ function PaymentPageContent({
                 )}
               </div>
               <Link href="/">
-                <Button className="w-full text-white">Return to TapFi</Button>
+                <Button className="w-full text-white">Return</Button>
               </Link>
             </CardContent>
           </Card>
@@ -218,9 +201,6 @@ function PaymentPageContent({
               <div className="text-center py-6 bg-gradient-to-r from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 rounded-xl">
                 <div className="text-4xl font-bold text-foreground mb-2">
                   {paymentData.amount} {paymentData.token}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  ≈ ${(Number.parseFloat(paymentData.amount) * (paymentData.token === "ETH" ? 2000 : 1)).toLocaleString()} USD
                 </div>
               </div>
               {paymentData.message && (
@@ -245,14 +225,8 @@ function PaymentPageContent({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Network</span>
-                    <span className="font-medium">Sepolia Testnet</span>
+                    <span className="font-medium">Virtual Sepolia Testnet</span>
                   </div>
-                  {tapBalance >= 1000 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Fee Discount</span>
-                      <span className="font-medium text-green-600">Free (Premium User)</span>
-                    </div>
-                  )}
                 </div>
               </div>
               <Separator />
@@ -276,10 +250,10 @@ function PaymentPageContent({
                     </div>
                     <Button
                       onClick={processPayment}
-                      disabled={isPending || isReceiptLoading || paymentStatus === "pending"}
+                      disabled={paymentStatus === "pending" || isReceiptLoading}
                       className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium py-3"
                     >
-                      {isPending || isReceiptLoading ? (
+                      {paymentStatus === "pending" || isReceiptLoading ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           Processing Payment...
@@ -290,18 +264,18 @@ function PaymentPageContent({
                     </Button>
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground text-center">Powered by TapFi • Secure Web3 Payments</p>
+                <p className="text-xs text-muted-foreground text-center">Powered by Web3 • Secure Payments</p>
               </div>
             </CardContent>
           </Card>
         )}
       </main>
     </div>
-  );
+  )
 }
 
 const WrappedPaymentPageContent: ComponentType<ServerPaymentPageProps> = withWalletAndTapToken(
   PaymentPageContent
-) as ComponentType<ServerPaymentPageProps>;
+) as ComponentType<ServerPaymentPageProps>
 
-export default WrappedPaymentPageContent;
+export default WrappedPaymentPageContent

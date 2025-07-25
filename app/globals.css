@@ -69,6 +69,10 @@
   }
 }
 
+.w3m-router-container .branding-only {
+  display: none!important;
+}
+
 /* Custom scrollbar - 다크모드 지원 */
 ::-webkit-scrollbar {
   width: 6px;

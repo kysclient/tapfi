@@ -9,7 +9,7 @@ import { PaymentHistory } from "@/components/PaymentHistory"
 import { PremiumFeatures } from "@/components/PremiumFeatures"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import Link from "next/link"
-import { withWalletAndTapToken } from "../hoc/with-wallet-and-taptoken"
+import { TransactionData, withWalletAndTapToken } from "../hoc/with-wallet-and-taptoken"
 
 interface HomePageProps {
     isWalletConnected: boolean
@@ -18,6 +18,7 @@ interface HomePageProps {
     disconnectWallet: () => void
     tapBalance: number
     isPremiumUser: boolean
+    getTransactionHistory: (walletAddress: string) => Promise<TransactionData[]>
 }
 
 function HomePage({
@@ -27,6 +28,7 @@ function HomePage({
     disconnectWallet,
     tapBalance,
     isPremiumUser,
+    getTransactionHistory
 }: HomePageProps) {
     const [activeTab, setActiveTab] = useState<"generate" | "history" | "premium">("generate")
     const [paymentData, setPaymentData] = useState({
@@ -150,13 +152,12 @@ function HomePage({
                         setPaymentData={setPaymentData}
                         onGenerate={handleGenerateQR}
                         isWalletConnected={isWalletConnected}
-                        isPremiumUser={isPremiumUser}
                         walletAddress={walletAddress}
                     />
                 )}
 
                 {activeTab === "history" && (
-                    <PaymentHistory isWalletConnected={isWalletConnected} walletAddress={walletAddress} />
+                    <PaymentHistory isWalletConnected={isWalletConnected} walletAddress={walletAddress} getTransactionHistory={getTransactionHistory} />
                 )}
 
                 {activeTab === "premium" && <PremiumFeatures tapBalance={tapBalance} isPremiumUser={isPremiumUser} />}

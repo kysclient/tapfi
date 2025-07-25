@@ -15,5 +15,6 @@ export default function Page() {
     disconnectWallet={() => console.log('Disconnecting wallet...')}
     tapBalance={1000}
     isPremiumUser={false}
+    getTransactionHistory={async () => []}
   />
 }

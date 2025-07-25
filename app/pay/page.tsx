@@ -13,7 +13,7 @@ interface PaymentData {
 }
 
 interface PaymentPageProps {
-    searchParams: { [key: string]: string | string[] | undefined };
+    data: { [key: string]: string | string[] | undefined };
 }
 
 interface WrappedPaymentPageContentProps {
@@ -21,23 +21,23 @@ interface WrappedPaymentPageContentProps {
 }
 
 
-export default async function PaymentPage({ searchParams }: PaymentPageProps) {
-    const params = await searchParams
-    const data = params.data;
+export default async function PaymentPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+
+    const result = await searchParams
+    console.log('searchParams : ', result)
     let paymentData: PaymentData | null = null;
     try {
-        if (data && typeof data === "string") {
-            paymentData = JSON.parse(decodeURIComponent(data));
+        if (result.data && typeof result.data === "string") {
+            paymentData = JSON.parse(decodeURIComponent(result.data));
+            console.log('paymentData : ', paymentData)
         }
     } catch (error) {
         console.error("Error parsing payment data:", error);
-        // paymentData가 null이면 컴포넌트에서 에러 UI를 렌더링
     }
 
     return (
         <Suspense fallback={<Loading />}>
-            <WrappedPaymentPageContent
-                paymentData={paymentData} />
+            <WrappedPaymentPageContent paymentData={paymentData} />
         </Suspense>
     );
 }
