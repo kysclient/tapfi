@@ -1,175 +1,344 @@
-"use client"
+"use client";
 
-import { useRef, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { QrCode, Copy, Download, Share2, Palette, MessageSquare } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { QRCodeCanvas } from "qrcode.react"
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { QrCode, Copy, Download, Share2, Palette, MessageSquare, Search } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { QRCodeCanvas } from "qrcode.react";
+import { isAddress } from "viem";
+import { debounce } from "lodash";
+import { TokenManager } from "@/lib/web3/token-manager";
+import { networks } from "@/lib/web3/config";
+import React from "react";
 
 interface PaymentData {
-  amount: string
-  token: string
-  message: string
-  recipientName: string
+  amount: string;
+  token: string;
+  message: string;
+  recipientName: string;
+  chainId?: number;
+}
+
+interface TokenInfo {
+  value: string;
+  label: string;
+  icon: string;
+  address?: string;
+  decimals: number;
+  balance?: string;
 }
 
 interface QRGeneratorProps {
-  paymentData: PaymentData
-  setPaymentData: (data: PaymentData) => void
-  onGenerate: () => void
-  isWalletConnected: boolean
-  walletAddress: string
+  paymentData: PaymentData;
+  setPaymentData: (data: PaymentData) => void;
+  onGenerate: () => void;
+  isWalletConnected: boolean;
+  walletAddress: string;
 }
 
-export function QRGenerator({
+const QRGenerator = ({
   paymentData,
   setPaymentData,
   onGenerate,
   isWalletConnected,
   walletAddress,
-}: QRGeneratorProps) {
-  const [qrGenerated, setQrGenerated] = useState(false)
-  const [qrTheme, setQrTheme] = useState("default")
-  const { toast } = useToast()
-  const qrRef = useRef<HTMLCanvasElement>(null)
+}: QRGeneratorProps) => {
+  const [qrGenerated, setQrGenerated] = useState(false);
+  const [qrTheme, setQrTheme] = useState("default");
+  const [tokens, setTokens] = useState<TokenInfo[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTokenDetails, setSelectedTokenDetails] = useState<TokenInfo | null>(null);
+  const [refreshingBalance, setRefreshingBalance] = useState(false);
+  const [networkError, setNetworkError] = useState<string | null>(null);
+  const qrRef = useRef<HTMLCanvasElement>(null);
+  const [qrValue, setQrValue] = useState("");
+  const { toast } = useToast();
+  const tokenManager = useMemo(() => new TokenManager(), []);
 
-  const tokens = [
-    { value: "ETH", label: "Ethereum (ETH)", icon: "⟠" },
-    { value: "USDC", label: "USD Coin (USDC)", icon: "💵" },
-    { value: "USDT", label: "Tether (USDT)", icon: "💰" },
-  ]
+  const currentChainId = paymentData.chainId || 1;
+
+  // Form validation
+  const isFormValid = useMemo(() => {
+    return (
+      !!paymentData.amount &&
+      parseFloat(paymentData.amount) > 0 &&
+      !!paymentData.token &&
+      !!paymentData.chainId &&
+      isAddress(walletAddress)
+    );
+  }, [paymentData, walletAddress]);
+
+  // Load tokens
+  const loadTokens = useCallback(async (chainId: number) => {
+    setLoading(true);
+    setNetworkError(null);
+    try {
+      const fetchedTokens = await tokenManager.getTokens(chainId);
+      setTokens(fetchedTokens);
+    } catch (error) {
+      setNetworkError("Failed to load tokens. Please try again.");
+      toast({ variant: "destructive", title: "토큰 목록을 불러오지 못했습니다" });
+    }
+    setLoading(false);
+  }, [tokenManager, toast]);
+
+  // Search tokens
+  const filteredTokens = useMemo(() => {
+    return tokenManager.searchTokens(currentChainId, searchQuery, tokens);
+  }, [currentChainId, searchQuery, tokens, tokenManager]);
+
+  // Initialize tokens on network change
+  useEffect(() => {
+    const initializeTokens = async () => {
+      setLoading(true);
+      await loadTokens(currentChainId);
+      setLoading(false);
+    };
+    initializeTokens();
+  }, [currentChainId, loadTokens]);
+
+  // Update selected token details
+  useEffect(() => {
+    if (paymentData.token && filteredTokens.length) {
+      const tokenInfo = filteredTokens.find((t) => t.value === paymentData.token);
+      setSelectedTokenDetails(tokenInfo || null);
+    } else {
+      setSelectedTokenDetails(null);
+    }
+  }, [paymentData.token, filteredTokens]);
+
+  // Refresh balance with debounce
+  const refreshBalance = useCallback(
+    debounce(async () => {
+      if (!paymentData.token || !isWalletConnected) return;
+      setRefreshingBalance(true);
+      try {
+        const updatedToken = await tokenManager.refreshTokenBalance(
+          currentChainId,
+          paymentData.token,
+          walletAddress
+        );
+        if (updatedToken) {
+          setSelectedTokenDetails(updatedToken);
+          setTokens((prev) =>
+            prev.map((t) => (t.value === updatedToken.value ? updatedToken : t))
+          );
+        }
+      } catch (error) {
+        toast({ variant: "destructive", title: "Error!", description: 'Something went wrong' });
+      }
+      setRefreshingBalance(false);
+    }, 500),
+    [paymentData.token, currentChainId, walletAddress, isWalletConnected, tokenManager, toast]
+  );
+
+  // Trigger balance refresh
+  useEffect(() => {
+    if (paymentData.chainId && paymentData.token && isWalletConnected) {
+      refreshBalance();
+    }
+  }, [paymentData.chainId, paymentData.token, isWalletConnected, refreshBalance]);
 
   const qrThemes = [
     { value: "default", label: "Default" },
     { value: "gradient", label: "Gradient" },
     { value: "neon", label: "Neon" },
     { value: "minimal", label: "Minimal" },
-  ]
-
-  const handleInputChange = (field: keyof PaymentData, value: string) => {
-    setPaymentData({ ...paymentData, [field]: value })
-  }
-
-  const generateQR = () => {
-    if (!paymentData.amount || !paymentData.token) {
-      toast({
-        title: "Missing information",
-        description: "Please fill in amount and token type",
-        variant: "destructive",
-      })
-      return
-    }
-    setQrGenerated(true)
-    toast({
-      title: "QR Code generated",
-      description: "Your payment QR code is ready to use",
-    })
-  }
+  ];
 
   const qrStyle = {
     default: { background: "#ffffff", foreground: "#000000" },
     gradient: { background: "#ffffff", foreground: "url(#gradient)" },
     neon: { background: "#000000", foreground: "#00ff00" },
     minimal: { background: "#ffffff", foreground: "#333333" },
-  }
+  };
 
-  const generateQrValue = () => {
+  const handleInputChange = useCallback(
+    (field: keyof PaymentData, value: string | number) => {
+      setPaymentData({ ...paymentData, [field]: value });
+    },
+    [paymentData, setPaymentData]
+  );
+
+  const handleNetworkChange = async (chainId: string) => {
+    const newChainId = parseInt(chainId, 10);
+    setPaymentData({ ...paymentData, chainId: newChainId, token: "" });
+    setSearchQuery("");
+    setSelectedTokenDetails(null);
+  };
+
+  const generateQR = async () => {
+    if (!isFormValid) {
+      toast({
+        variant: "destructive",
+        title: "Required fields missing",
+        description: "Please fill in amount, token, network, and connect a valid wallet",
+      });
+      return;
+    }
+
+    const selectedToken = tokens.find((t) => t.value === paymentData.token);
+    if (!selectedToken) {
+      toast({
+        variant: "destructive",
+        title: "Invalid token",
+        description: "Selected token is not available",
+      });
+      return;
+    }
+
+    // Generate QR code pointing to /pay page
     const qrData = {
       to: walletAddress,
       amount: paymentData.amount,
       token: paymentData.token,
-      message: paymentData.message,
-      recipient: paymentData.recipientName,
-      chainId: 73571, // Virtual TestNet
-    }
-    return `${window.location.origin}/pay?data=${encodeURIComponent(JSON.stringify(qrData))}`
-  }
+      tokenAddress: selectedToken.address || "",
+      chainId: paymentData.chainId,
+      message: paymentData.message || "",
+      recipient: paymentData.recipientName || "",
+      timestamp: Date.now(),
+    };
 
-  const copyQRLink = () => {
-    const qrUrl = generateQrValue()
-    navigator.clipboard.writeText(qrUrl)
-    toast({
-      title: "Link copied",
-      description: "Payment link has been copied to clipboard",
-    })
-  }
+    const qrUrl = `${window.location.origin}/pay?data=${encodeURIComponent(JSON.stringify(qrData))}`;
+    setQrValue(qrUrl);
+    setQrGenerated(true);
+    // onGenerate();
+  };
 
-  const downloadQRCode = () => {
+  const copyQRLink = async () => {
+    if (!qrValue) return;
     try {
-      if (!qrRef.current) throw new Error("QR code canvas not found")
-      const canvas = qrRef.current
-      const dataUrl = canvas.toDataURL("image/png")
-      const link = document.createElement("a")
-      link.href = dataUrl
-      link.download = `payment-qr-${Date.now()}.png`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      toast({
-        title: "QR Code Downloaded",
-        description: "The QR code has been downloaded as a PNG file.",
-      })
-    } catch (error: any) {
-      console.error("Error downloading QR code:", error)
-      toast({
-        title: "Error",
-        description: "Failed to download QR code. Please try again.",
-        variant: "destructive",
-      })
+      await navigator.clipboard.writeText(qrValue);
+      toast({ title: "Payment link copied to clipboard!" });
+    } catch (err) {
+      console.error("Failed to copy:", err);
+      toast({ variant: "destructive", title: "Failed to copy link" });
     }
-  }
+  };
+
+  const downloadQRCode = async () => {
+    try {
+      if (!qrRef.current) throw new Error("QR code canvas not found");
+      const canvas = qrRef.current;
+      const dataUrl = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `payment-qr-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast({ title: "QR Code downloaded successfully!" });
+    } catch (error) {
+      console.error("Error downloading QR code:", error);
+      toast({ variant: "destructive", title: "Failed to download QR code" });
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <Card className="shadow-sm border-0 bg-card">
         <CardHeader className="pb-4">
-          <CardTitle className="text-xl font-semibold text-foreground">Create Payment QR</CardTitle>
+          <CardTitle className="text-xl font-semibold text-foreground">Create Payment QR Code</CardTitle>
           <CardDescription className="text-muted-foreground">
             Generate a QR code for receiving Web3 payments
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="amount" className="text-sm font-medium text-foreground">
-                  Amount *
-                </Label>
+          <div className="space-y-2">
+            <Label htmlFor="amount" className="text-sm font-medium text-foreground">
+              Amount *
+            </Label>
+            <Input
+              id="amount"
+              type="number"
+              placeholder="0.00"
+              value={paymentData.amount}
+              onChange={(e) => handleInputChange("amount", e.target.value)}
+              className="text-right border-border focus:border-primary focus:ring-primary"
+            />
+          </div>
+
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="network" className="text-sm font-medium text-foreground">
+                Network *
+              </Label>
+              <Select
+                value={paymentData.chainId?.toString() || "1"}
+                onValueChange={handleNetworkChange}
+              >
+                <SelectTrigger className="border-border focus:border-primary focus:ring-primary">
+                  <SelectValue placeholder="Select network" />
+                </SelectTrigger>
+                <SelectContent>
+                  {networks.map((network) => (
+                    <SelectItem key={network.id} value={network.id.toString()}>
+                      {network.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {networkError && (
+                <p className="text-sm text-red-500">{networkError}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+                Token * {loading && <span className="text-xs text-muted-foreground">(Loading...)</span>}
+              </Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                 <Input
-                  id="amount"
-                  type="number"
-                  placeholder="0.00"
-                  value={paymentData.amount}
-                  onChange={(e) => handleInputChange("amount", e.target.value)}
-                  className="border-border focus:border-primary focus:ring-primary"
+                  placeholder="Search tokens..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 border-border focus:border-primary focus:ring-primary"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="token" className="text-sm font-medium text-foreground">
-                  Token *
-                </Label>
-                <Select value={paymentData.token} onValueChange={(value) => handleInputChange("token", value)}>
-                  <SelectTrigger className="border-border focus:border-primary focus:ring-primary">
-                    <SelectValue placeholder="Select token" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tokens.map((token) => (
-                      <SelectItem key={token.value} value={token.value}>
-                        <span className="flex items-center gap-2">
-                          <span>{token.icon}</span>
-                          {token.label}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select
+                value={paymentData.token}
+                onValueChange={(value) => handleInputChange("token", value)}
+                disabled={loading || !filteredTokens?.length}
+              >
+                <SelectTrigger className="border-border focus:border-primary focus:ring-primary">
+                  <SelectValue placeholder={loading ? "Loading tokens..." : "Select token"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredTokens.map((token) => (
+                    <SelectItem key={token.value} value={token.value}>
+                      <span className="flex items-center gap-2 w-full">
+                        <img src={token.icon} alt={token.value} className="w-4 h-4" />
+                        <span className="flex-1">{token.label}</span>
+                        {token.balance && (
+                          <span className="text-xs text-muted-foreground ml-2">{token.balance}</span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* {selectedTokenDetails && (
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <img src={selectedTokenDetails.icon} alt={selectedTokenDetails.value} className="w-6 h-6" onError={(e) => (e.currentTarget.src = "/images/fallback-token.png")} />
+                    <div>
+                      <div className="font-medium text-sm">{selectedTokenDetails.value}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Balance: {refreshingBalance ? "Loading..." : selectedTokenDetails.balance || "Unknown"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )} */}
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="recipientName" className="text-sm font-medium text-foreground">
                 Your Name
@@ -217,11 +386,22 @@ export function QRGenerator({
           </div>
           <Button
             onClick={generateQR}
-            disabled={!isWalletConnected}
+            disabled={!isWalletConnected || !isFormValid || loading}
             className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3"
           >
-            <QrCode className="w-4 h-4 mr-2" />
-            {isWalletConnected ? "Generate QR Code" : "Connect Wallet First"}
+            {loading || refreshingBalance ? (
+              <span>Loading...</span>
+            ) : isWalletConnected ? (
+              <>
+                <QrCode className="w-4 h-4 mr-2" />
+                Generate QR Code
+              </>
+            ) : (
+              <>
+                <QrCode className="w-4 h-4 mr-2" />
+                Connect Wallet First
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -247,7 +427,7 @@ export function QRGenerator({
                   <QRCodeCanvas
                     ref={qrRef}
                     id="qr-code"
-                    value={generateQrValue()}
+                    value={qrValue}
                     size={180}
                     bgColor={qrTheme === "gradient" ? "#ffffff" : qrStyle[qrTheme as keyof typeof qrStyle].background}
                     fgColor={qrTheme === "gradient" ? "#3B82F6" : qrStyle[qrTheme as keyof typeof qrStyle].foreground}
@@ -270,6 +450,12 @@ export function QRGenerator({
                   <span className="text-sm text-muted-foreground">Amount</span>
                   <span className="font-semibold text-foreground">
                     {paymentData.amount} {paymentData.token}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Network</span>
+                  <span className="font-medium text-foreground">
+                    {networks.find((n) => n.id === (paymentData.chainId || 1))?.name || "Unknown"}
                   </span>
                 </div>
                 {paymentData.recipientName && (
@@ -318,5 +504,7 @@ export function QRGenerator({
         </CardContent>
       </Card>
     </div>
-  )
-}
+  );
+};
+
+export default React.memo(QRGenerator);

@@ -4,12 +4,13 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { QrCode, Wallet, Zap, Crown, History } from "lucide-react"
-import { QRGenerator } from "@/components/QRGenerator"
 import { PaymentHistory } from "@/components/PaymentHistory"
 import { PremiumFeatures } from "@/components/PremiumFeatures"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import Link from "next/link"
 import { TransactionData, withWalletAndTapToken } from "../hoc/with-wallet-and-taptoken"
+import QRGenerator from "../QRGenerator"
+import { ConnectButton } from "../ConnectButton"
 
 interface HomePageProps {
     isWalletConnected: boolean
@@ -58,7 +59,7 @@ function HomePage({
                             {/* <QrCode className="w-6 h-6 text-white" /> */}
                         </Link>
                         {/* </div> */}
-                        <div>
+                        <div className="hidden sm:block">
                             <h1 className="text-xl font-bold text-foreground">TapFi</h1>
                             <p className="text-sm text-muted-foreground">Web3 QR Payment</p>
                         </div>
@@ -94,6 +95,7 @@ function HomePage({
                                 </Button>
                             </div>
                         ) : (
+                            <>
                             <Button
                                 onClick={connectWallet}
                                 className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white"
@@ -101,6 +103,7 @@ function HomePage({
                                 <Wallet className="w-4 h-4 mr-2" />
                                 Connect Wallet
                             </Button>
+                            </>
                         )}
                     </div>
                 </div>
@@ -109,10 +112,10 @@ function HomePage({
             {/* Navigation */}
             <nav className="bg-card border-b border-border sticky top-0">
                 <div className="max-w-4xl mx-auto px-4">
-                    <div className="flex space-x-8">
+                    <div className="flex space-x-8 items-start justify-between sm:justify-start">
                         <button
                             onClick={() => setActiveTab("generate")}
-                            className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${activeTab === "generate"
+                            className={`flex flex-col gap-2 items-center py-4 px-2 border-b-2 font-medium text-xs sm:text-sm transition-colors ${activeTab === "generate"
                                 ? "border-primary text-primary"
                                 : "border-transparent text-muted-foreground hover:text-foreground"
                                 }`}
@@ -122,7 +125,7 @@ function HomePage({
                         </button>
                         <button
                             onClick={() => setActiveTab("history")}
-                            className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${activeTab === "history"
+                            className={`flex flex-col gap-2 items-center py-4 px-2 border-b-2 font-medium text-xs sm:text-sm transition-colors ${activeTab === "history"
                                 ? "border-primary text-primary"
                                 : "border-transparent text-muted-foreground hover:text-foreground"
                                 }`}
@@ -132,7 +135,7 @@ function HomePage({
                         </button>
                         <button
                             onClick={() => setActiveTab("premium")}
-                            className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${activeTab === "premium"
+                            className={`flex flex-col gap-2 items-center py-4 px-2 border-b-2 font-medium text-xs sm:text-sm transition-colors ${activeTab === "premium"
                                 ? "border-primary text-primary"
                                 : "border-transparent text-muted-foreground hover:text-foreground"
                                 }`}
@@ -162,7 +165,7 @@ function HomePage({
 
                 {activeTab === "premium" && <PremiumFeatures tapBalance={tapBalance} isPremiumUser={isPremiumUser} />}
             </main>
-            <p className="text-xs text-muted-foreground text-center">Powered by TapFi • Secure Web3 Payments</p>
+            <p className="text-xs text-muted-foreground text-center py-4">Powered by TapFi • Secure Web3 Payments</p>
 
 
         </div>

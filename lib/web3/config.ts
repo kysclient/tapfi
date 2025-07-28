@@ -1,5 +1,5 @@
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
-import { mainnet, arbitrum, sepolia } from '@reown/appkit/networks'
+import { mainnet, polygon, arbitrum, optimism, avalanche, bsc, base, fantom, gnosis, celo, worldchain } from "@reown/appkit/networks";
 import type { AppKitNetwork } from '@reown/appkit/networks'
 import { vTestnet } from '@/app/tenderly.config'
 import { cookieStorage, createStorage, http } from 'wagmi'
@@ -11,7 +11,7 @@ if (!projectId) {
   throw new Error('Project ID is not defined')
 }
 
-export const networks = [mainnet, arbitrum, vTestnet] as [AppKitNetwork, ...AppKitNetwork[]]
+export const networks = [mainnet, worldchain, arbitrum, polygon, optimism, avalanche, bsc, base, fantom, gnosis, celo, vTestnet] as [AppKitNetwork, ...AppKitNetwork[]]
 
 //Set up the Wagmi Adapter (Config)
 export const wagmiAdapter = new WagmiAdapter({
