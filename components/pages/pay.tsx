@@ -101,15 +101,15 @@ function PaymentPageContent({
           value: parseEther(paymentData.amount),
         })
       } else {
-        const tokenInfo = getTokenInfo(paymentData.token)
-        if (!tokenInfo) {
-          throw new Error(`Token ${paymentData.token} is not supported`)
+        // const tokenInfo = getTokenInfo(paymentData.token)
+        if (!paymentData.tokenInfo) {
+          throw new Error(`Token ${paymentData.token} is not set`)
         }
         hash = await writeContractAsync({
-          address: tokenInfo.address as `0x${string}`,
+          address: paymentData.tokenInfo.address as `0x${string}`,
           abi: ERC20_ABI,
           functionName: "transfer",
-          args: [paymentData.to as `0x${string}`, parseUnits(paymentData.amount, tokenInfo.decimals)],
+          args: [paymentData.to as `0x${string}`, parseUnits(paymentData.amount, paymentData.tokenInfo.decimals)],
         })
       }
       setTxHash(hash)

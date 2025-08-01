@@ -27,7 +27,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem={true} disableTransitionOnChange>
+        <ThemeProvider attribute="class" enableSystem={true} disableTransitionOnChange>
           <ContextProvider cookies={cookies}>
             {children}
           </ContextProvider>

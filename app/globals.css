@@ -33,15 +33,19 @@
 
   .dark {
     /* 토스 다크모드 스타일 색상 */
-    --background: 210 11% 15%; /* 어두운 블루그레이 */
+    --background: 210 11% 15%;
+    /* 어두운 블루그레이 */
     --foreground: 210 40% 98%;
-    --card: 210 11% 17%; /* 카드 배경 */
+    --card: 210 11% 17%;
+    /* 카드 배경 */
     --card-foreground: 210 40% 98%;
     --popover: 210 11% 17%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%; /* 토스 블루 */
+    --primary: 217.2 91.2% 59.8%;
+    /* 토스 블루 */
     --primary-foreground: 210 11% 15%;
-    --secondary: 210 11% 21%; /* 세컨더리 배경 */
+    --secondary: 210 11% 21%;
+    /* 세컨더리 배경 */
     --secondary-foreground: 210 40% 98%;
     --muted: 210 11% 21%;
     --muted-foreground: 215 20.2% 65.1%;
@@ -49,7 +53,8 @@
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 210 11% 25%; /* 보더 색상 */
+    --border: 210 11% 25%;
+    /* 보더 색상 */
     --input: 210 11% 25%;
     --ring: 217.2 91.2% 59.8%;
     --chart-1: 220 70% 50%;
@@ -64,13 +69,22 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
+  w3m-legal-footer {
+    display: none !important;
+  }
+}
+
+:where(w3m-modal) w3m-legal-footer {
+  display: none !important;
 }
 
 .w3m-router-container .branding-only {
-  display: none!important;
+  display: none !important;
 }
 
 /* Custom scrollbar - 다크모드 지원 */
@@ -97,10 +111,12 @@
 
 /* Custom gradient animations */
 @keyframes gradient-x {
+
   0%,
   100% {
     transform: translateX(0%);
   }
+
   50% {
     transform: translateX(-100%);
   }

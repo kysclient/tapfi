@@ -43,9 +43,10 @@ export interface PaymentData {
   amount: string
   token: string
   recipientName?: string
-  message?: string
+  message: string | undefined
   to: string
   chainId?: number
+  tokenInfo?: TokenInfo
 }
 
 export interface WalletAndTapTokenProps {

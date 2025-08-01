@@ -15,14 +15,8 @@ import { debounce } from "lodash";
 import { TokenManager } from "@/lib/web3/token-manager";
 import { networks } from "@/lib/web3/config";
 import React from "react";
+import { PaymentData } from "./hoc/with-wallet-and-taptoken";
 
-interface PaymentData {
-  amount: string;
-  token: string;
-  message: string;
-  recipientName: string;
-  chainId?: number;
-}
 
 interface TokenInfo {
   value: string;
@@ -35,7 +29,7 @@ interface TokenInfo {
 
 interface QRGeneratorProps {
   paymentData: PaymentData;
-  setPaymentData: (data: PaymentData) => void;
+  setPaymentData: any;
   onGenerate: () => void;
   isWalletConnected: boolean;
   walletAddress: string;
@@ -129,6 +123,10 @@ const QRGenerator = ({
           setTokens((prev) =>
             prev.map((t) => (t.value === updatedToken.value ? updatedToken : t))
           );
+          setPaymentData((prev: PaymentData) => ({
+            ...prev,
+            tokenInfo: updatedToken,
+          }));
         }
       } catch (error) {
         toast({ variant: "destructive", title: "Error!", description: 'Something went wrong' });
@@ -270,7 +268,7 @@ const QRGenerator = ({
                 Network *
               </Label>
               <Select
-                value={paymentData.chainId?.toString() || "1"}
+                value={paymentData.chainId?.toString() || ""}
                 onValueChange={handleNetworkChange}
               >
                 <SelectTrigger className="border-border focus:border-primary focus:ring-primary">
